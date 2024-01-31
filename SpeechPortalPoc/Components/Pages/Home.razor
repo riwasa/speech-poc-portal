@@ -1,0 +1,192 @@
+﻿@page "/"
+
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using SpeechPortalPoc;
+
+@rendermode InteractiveServer
+
+@inject IConfiguration configuration
+@inject IDialogService DialogService
+@inject NavigationManager navigationManager
+
+<PageTitle>Home</PageTitle>
+
+@if (callSummaries == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center">
+        <FluentNumberField @bind-Value="@PageSize" Label="Page Size" Min="1" Max="100" Step="1" Width="100" />
+        <FluentButton OnClick="UpdatePageSize" Appearance="Appearance.Accent">Update</FluentButton>
+    </FluentStack>
+
+    <div class="grid">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>File Name</th>
+                    <th>Creation Date</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var callSummary in callSummaries)
+                {
+                    <tr>
+                        <td>@callSummary.FileName</td>
+                        <td>@callSummary.CreationDate</td>
+                        <td>
+                            <FluentButton @onclick="@(() => OpenPanelAsync(callSummary))" 
+                                Appearance="Appearance.Accent">
+                                Open
+                            </FluentButton>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <FluentStack VerticalAlignment="VerticalAlignment.Center">
+        <FluentButton OnClick="@(() => LoadGrid("prev"))" Appearance="Appearance.Accent" Disabled="@(pageNumber == 0)">Previous</FluentButton>
+        <FluentButton OnClick="@(() => LoadGrid("next"))" Appearance="Appearance.Accent" Disabled="@(!isNextPage)">Next</FluentButton>
+    </FluentStack>
+}
+
+@code {
+    // Call summaries for the given page number.
+    private List<CallSummary>? callSummaries;
+
+    // Call details panel reference.
+    private IDialogReference? dialog;
+
+    // Flag to indicate if there is a next page.
+    private bool isNextPage = false;
+
+    // Current 0-based page number.
+    private int pageNumber = 0;
+
+    // Page size.
+    private int PageSize = 10;
+
+    // Continuation tokens for all pages retrieved so far.
+    private List<string> pageTokens = new();
+
+    /// <summary>
+    /// Invoked after the component has been rendered inactively and the UI
+    /// has finished updating.
+    /// </summary>
+    /// <param name="firstRender">true if this is the first time beeing invoked.</param>
+    /// <returns>Nothing.</returns>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadGrid(null);
+        }
+    }
+
+    /// <summary>
+    /// Gets the continuation token for the given page number.
+    /// </summary>
+    /// <param name="pageNumber">Page number.</param>
+    /// <returns>Continuation token; otherwise null.</returns>
+    private string? GetPageToken(int pageNumber)
+    {
+        if (pageNumber + 1 > pageTokens.Count)
+        {
+            return null;
+        }
+        else
+        {
+            return pageTokens[pageNumber];
+        }
+    }
+
+    /// <summary>
+    /// Loads the grid with appropriate call summaries.
+    /// </summary>
+    /// <param name="action">Action to take; null (for first load), previous or next.</param>
+    /// <returns>Nothing.</returns>
+    private async Task LoadGrid(string? action)
+    {
+        string? continuationToken = null;
+
+        // Get the continuation token for the given page number.
+        if (action == null)
+        {
+            continuationToken = null;
+            pageTokens.Add(null);
+        }
+        else
+        {
+            if (action == "next")
+            {
+                pageNumber++;
+            }
+            else
+            {
+                pageNumber--;
+            }
+
+            continuationToken = GetPageToken(pageNumber);
+        }
+
+        // Get the call summaries for the given page number.
+        BlobHelper blobHelper = new BlobHelper(configuration.GetConnectionString("StorageAccount"));
+        (callSummaries, continuationToken) = await blobHelper.GetCallSummaryListAsync(
+            configuration["OutputContainer"], PageSize, continuationToken);
+
+        // Save any continuation token for the next page.
+        if (!string.IsNullOrWhiteSpace(continuationToken))
+        {
+            isNextPage = true;
+
+            if (GetPageToken(pageNumber + 1) == null)
+            {
+                pageTokens.Add(continuationToken);
+            }
+        }
+        else
+        {
+            isNextPage = false;
+        }
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Opens a panel to display the call details.
+    /// </summary>
+    /// <param name="callSummary">Call summary.</param>
+    /// <returns>Nothing.</returns>
+    private async Task OpenPanelAsync(CallSummary callSummary)
+    {
+        dialog = await DialogService.ShowPanelAsync<CallPanel>(
+            callSummary, new DialogParameters<CallSummary>()
+            {
+                Alignment = HorizontalAlignment.Right,
+                Content = callSummary,
+                PrimaryAction = "Close",
+                SecondaryAction = null,
+                Title = "Call Details",
+                Width = "900px"
+            }
+        );
+
+        DialogResult result = await dialog.Result;
+    }
+
+    /// <summary>
+    /// Reloads the grid using the current page size.
+    /// </summary>
+    private void UpdatePageSize()
+    {
+        pageTokens.Clear();
+        LoadGrid(null);
+    }
+}
+
+        

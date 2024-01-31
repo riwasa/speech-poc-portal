@@ -1,0 +1,301 @@
+﻿@using SpeechPortalPoc;
+
+@rendermode InteractiveServer
+
+@implements IDialogContentComponent<CallSummary>
+
+@inject IConfiguration configuration
+
+<FluentDialogBody>
+    <FluentTextField @bind-Value="@Content.FileName" ReadOnly="true" Size="100">File Name: </FluentTextField>
+    
+    <br/><br/>
+
+    <FluentLayout>
+        <FluentStack Orientation="Orientation.Horizontal" Width="100">
+            <FluentStack Orientation="Orientation.Vertical">
+                <FluentCard>
+                    <h4>Audio Player</h4>
+
+                    @if (!string.IsNullOrEmpty(CallAudio))
+                    {
+                        <audio controls autobuffer="autobuffer">
+                            <source src="@($"data:audio/wav;base64,{CallAudio}")" type="audio/wav" />
+                        </audio>
+                    }
+                </FluentCard>
+                <FluentCard>
+                    <h4>Transcription</h4>
+
+                    @if (Call != null && Transcript != null)
+                    {
+                        foreach (var transcript in Transcript)
+                        {
+                            <hr/>
+                            <div>
+                                @($@"{transcript.StartTime} - {transcript.EndTime}  {transcript.Speaker}")
+                                <br/>
+                                @($@"{transcript.Text}")
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p><em>Loading...</em></p>
+                    }
+                </FluentCard>
+            </FluentStack>
+            <FluentStack Orientation="Orientation.Vertical">
+                <div>
+                    <FluentCard>
+                        <h4>Conversation Summary</h4>
+                        @if (Call != null)
+                        {
+                            <FluentLabel>@Call.Summary</FluentLabel>
+                        }
+                        else
+                        {
+                            <p><em>Loading...</em></p>
+                        }
+                    </FluentCard>
+                </div>
+                <div>
+                    <FluentCard>
+                        <h4>Call Highlights</h4>
+
+                        <h5>Overall Sentiment</h5>
+                        @if (Call != null)
+                        {
+                            <FluentLabel>@Call.Sentiment</FluentLabel>
+                        }
+                        else
+                        {
+                            <p><em>Loading...</em></p>
+                        }
+
+                        <br />
+
+                        <h5>Category</h5>
+                        @if (Call != null)
+                        {
+                            <FluentLabel>@Call.Category</FluentLabel>
+                        }
+                        else
+                        {
+                            <p><em>Loading...</em></p>
+                        }
+
+                        <br />
+
+                        <h5>Entities Recognized</h5>
+                        <h6>Companies:</h6>
+                        @if (Call != null && Companies != null)
+                        {
+                            @foreach (var company in Companies)
+                            {
+                                <ul>
+                                    <li>@company</li>
+                                </ul>
+                            }
+                        }
+                        else
+                        {
+                            <p><em>Loading...</em></p>
+                        }
+                        <h6>People &amp; titles:</h6>
+                        @if (Call != null && People != null)
+                        {
+                            @foreach (var person in People)
+                            {
+                                <ul>
+                                    <li>@person</li>
+                                </ul>
+                            }
+                        }
+                        else
+                        {
+                            <p><em>Loading...</em></p>
+                        }
+
+                        <br />
+
+                        <h5>Key Discussion Topics</h5>
+                        @if (Call != null && Topics != null)
+                        {
+                            @foreach (var topic in Topics)
+                            {
+                                <ul>
+                                    <li>@topic</li>
+                                </ul>
+                            }
+                        }
+                        else
+                        {
+                            <p><em>Loading...</em></p>
+                        }
+
+                        <br />
+
+                        <h5>Key Items</h5>
+                        @if (Call != null && KeyItems != null)
+                        {
+                            @foreach (var keyItem in KeyItems)
+                            {
+                                <ul>
+                                    <li>@keyItem</li>
+                                </ul>
+                            }
+                        }
+                        else
+                        {
+                            <p><em>Loading...</em></p>
+                        }
+                    </FluentCard>
+                </div>
+            </FluentStack>
+        </FluentStack>
+    </FluentLayout>
+</FluentDialogBody>
+
+@code {
+    // Call summary.
+    [Parameter]
+    public CallSummary? Content { get; set; } = default!;
+
+    // Call details.
+    private Call? Call;
+
+    // Audio file.
+    private string? CallAudio;
+
+    // Companies.
+    private string[] Companies;
+
+    // Key items.
+    private string[] KeyItems;
+
+    // People.
+    private string[] People;
+
+    // Topics.
+    private string[] Topics;
+
+    // Call transcript.
+    private TranscriptItem[] Transcript;
+
+    /// <summary>
+    /// Method invoked when the component is ready to start, having received its initial parameters
+    /// from its parent in the render tree.
+    /// </summary>
+    /// <returns>Nothing.</returns>
+    protected override async Task OnInitializedAsync()
+    {
+        BlobHelper blobHelper = new BlobHelper(configuration.GetConnectionString("StorageAccount"));
+        Call = await blobHelper.GetCallAsync(configuration["OutputContainer"], Content.FileName);
+
+        string audioFileName = Content.FileName.Replace(".json", "");
+
+        MemoryStream ms = await blobHelper.GetAudioFileAsync(configuration["AudioContainer"], audioFileName);
+        CallAudio = Convert.ToBase64String(ms.ToArray());
+
+        // Get companies and people.
+        Companies = Array.Empty<string>();
+        People = Array.Empty<string>();
+
+        if (Call != null && Call.NER != null && Call.NER.Count() > 0)
+        {
+            foreach (var ner in Call.NER)
+            {
+                if (ner.Companies != null && ner.Companies.Count() > 0)
+                {
+                    Companies = ner.Companies;
+                }
+
+                if (ner.People != null && ner.People.Count() > 0)
+                {
+                    People = ner.People;
+                }
+            }
+        }
+
+        // Get Key Items.
+        KeyItems = Array.Empty<string>();
+
+        if (Call != null && Call.key_items != null && Call.key_items.Count() > 0)
+        {
+            KeyItems = Call.key_items;
+        }
+
+        // Get topics.
+        Topics = Array.Empty<string>();
+
+        if (Call != null && Call.Topic != null && Call.Topic.Count() > 0)
+        {
+            Topics = Call.Topic;
+        }
+
+        Transcript = GetTranscript(Call);
+    }
+
+    private TranscriptItem[] GetTranscript(Call call)
+    {
+        List<TranscriptItem> transcript = new();
+
+        if (call == null || call.RecognizedPhrases == null)
+        {
+            return Array.Empty<TranscriptItem>();
+        }
+
+        foreach (var phrase in call.RecognizedPhrases)
+        {
+            int speaker = 0;
+
+            if (phrase.Speaker == 0)
+            {
+                if (phrase.Channel == 0)
+                {
+                    speaker = 1;
+                }
+                else
+                {
+                    speaker = phrase.Channel + 1;
+                }
+            }
+            else
+            {
+                speaker = phrase.Speaker;
+            }
+
+            decimal duration = Convert.ToInt32(phrase.DurationInTicks) / 10000;
+            decimal offset = Convert.ToInt32(phrase.OffsetInTicks) / 10000;
+
+            transcript.Add(new TranscriptItem
+            {
+                Duration = Convert.ToInt32(phrase.DurationInTicks) / 10000,
+                EndTime = GetTime(offset + duration),
+                Offset = Convert.ToInt32(phrase.OffsetInTicks) / 10000,
+                Speaker = $"Speaker {speaker}",
+                StartTime = GetTime(offset),
+                Text = phrase.NBest[0]?.Display
+            });
+        }
+
+        return transcript.ToArray();
+    }
+
+    private string GetTime(decimal milliseconds)
+    {
+        string time = "";
+
+        if (milliseconds < 3600000)
+        {
+            time = $"{milliseconds / 60000:00}:{milliseconds / 1000 % 60:00}";
+        }
+        else
+        {
+            time = $"{milliseconds / 3600000:00}:{milliseconds / 60000 % 60:00}:{milliseconds / 1000 % 60:00}";
+        }
+
+        return time;
+    }
+}
