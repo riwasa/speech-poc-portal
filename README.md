@@ -18,7 +18,7 @@ In the Azure portal, go to the "Settings / Resource sharing (CORS)" blade. Under
 
 Click Save to save the new rule.
 
-## Local app settings.
+## Local app settings
 
 When running locally, you can create an appsettings.Development.json file, with the following contents:
 
@@ -62,3 +62,14 @@ One connection string is required.
 - Value is the account connection string (not a SAS token) for the Storage Account containing the AudioContainer and the OutputContainer.
 - The connection string type is Custom.
 
+## Project files
+
+Main files of interest in the project are:
+
+| File                             | Description                                                                            |
+|----------------------------------|----------------------------------------------------------------------------------------|
+| Components/Pages/CallPanel.razor | Flyout panel showing the details of a call.                                            |
+| Components/Pages/Home.razor      | Home page showing a pageable grid of recordings.                                       |
+| Entities/Call.cs                 | Details about a call, matching the structure of the .json file for an audio recording. |
+| Entities/CallSummary.cs          | Summary of call, displayed on Home.razor.                                              |
+| Helpers/BlobHelper.cs            | Contains methods to enumerate containers and download blobs.                           |
