@@ -266,14 +266,14 @@
                 speaker = phrase.Speaker;
             }
 
-            decimal duration = Convert.ToInt32(phrase.DurationInTicks) / 10000;
-            decimal offset = Convert.ToInt32(phrase.OffsetInTicks) / 10000;
+            decimal duration = Convert.ToInt64(phrase.DurationInTicks) / 10000;
+            decimal offset = Convert.ToInt64(phrase.OffsetInTicks) / 10000;
 
             transcript.Add(new TranscriptItem
             {
-                Duration = Convert.ToInt32(phrase.DurationInTicks) / 10000,
+                Duration = Convert.ToInt64(phrase.DurationInTicks) / 10000,
                 EndTime = GetTime(offset + duration),
-                Offset = Convert.ToInt32(phrase.OffsetInTicks) / 10000,
+                Offset = Convert.ToInt64(phrase.OffsetInTicks) / 10000,
                 Speaker = $"Speaker {speaker}",
                 StartTime = GetTime(offset),
                 Text = phrase.NBest[0]?.Display
