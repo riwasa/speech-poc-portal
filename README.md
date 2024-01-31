@@ -73,3 +73,13 @@ Main files of interest in the project are:
 | Entities/Call.cs                 | Details about a call, matching the structure of the .json file for an audio recording. |
 | Entities/CallSummary.cs          | Summary of call, displayed on Home.razor.                                              |
 | Helpers/BlobHelper.cs            | Contains methods to enumerate containers and download blobs.                           |
+
+## Application
+
+The home page has a pageable grid listing out files from the output container. You can change the page size, but this will reload
+the grid and position you on the first page. Note because of the way blob storage works, you cannot directly jump to a particular page, 
+you must go through the container page-by-page.
+![alt text](docs/home.png?raw=true)
+
+Clicking the Open button for a particular file will open a flyout panel containing details about the call.
+![alt text](docs/call-details.png?raw=true)
